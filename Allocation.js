@@ -191,6 +191,10 @@ processResource(
       resource
     );
 
+  this.applyBaseAllocation(
+    context
+  );
+
   result.overflow[
     resource.name
   ] = context.remaining;
@@ -252,6 +256,55 @@ buildResourceContext(
     eligible
 
   };
+
+},
+
+/**
+ * Apply fair base allocation (Option A).
+ *
+ * Everyone receives the same base amount.
+ * Leftover resources are handled later by Rotation.
+ */
+applyBaseAllocation(context) {
+
+  if (context.remaining <= 0)
+    return;
+
+  if (context.eligible.length === 0)
+    return;
+
+  const base = Math.floor(
+    context.remaining /
+    context.eligible.length
+  );
+
+  if (base <= 0)
+    return;
+
+  let allocated = 0;
+
+  context.eligible.forEach(player => {
+
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
+
+    const grant =
+      Math.min(
+        base,
+        slot.remainingCapacity
+      );
+
+    slot.assigned += grant;
+
+    slot.remainingCapacity -= grant;
+
+    allocated += grant;
+
+  });
+
+  context.remaining -= allocated;
 
 },
 

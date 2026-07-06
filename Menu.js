@@ -6,7 +6,7 @@ function testValidation() {
 
 }
 
-function testAllocationStage1() {
+function testAllocation() {
 
   const workbook =
     Workbook.read();
