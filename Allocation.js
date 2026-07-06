@@ -3,10 +3,15 @@
  * Guild Bid Manager V4
  * Allocation.gs
  *
- * Stage 1
- * Allocation Engine Foundation
+ * Allocation Pipeline
  *
- * NO SpreadsheetApp calls.
+ * 1. Build Allocation Objects
+ * 2. Apply Reserved Allocations
+ * 3. Base Allocation
+ * 4. Rotation
+ * 5. Reserve Allocation
+ * 6. Overflow
+ *
  * Pure JavaScript only.
  * ============================================================
  */
@@ -14,334 +19,211 @@
 const Allocator = Object.freeze({
 
   /**
-   * Main entry point.
-   *
-   * @param {Object} workbook
-   * @returns {Object}
+   * Entry point.
    */
-allocate(workbook) {
+  allocate(workbook) {
 
-  const result = {
+    const result = {
 
-    allocations: [],
-
-    overflow: {},
-
-    rotationIndex:
-      workbook.settings.rotationIndex
-
-  };
-
-  const players =
-    this.getEligiblePlayers(
-      workbook.players
-    );
-
-  result.allocations =
-    players.map(player =>
-      this.createAllocation(
-        player,
+      allocations: this.buildAllocations(
+        workbook.players,
         workbook.settings.resources
-      )
-    );
+      ),
 
-  // Build fast lookup table
+      overflow: {},
 
-  const allocationMap =
-    new Map();
-
-  result.allocations.forEach(a => {
-
-    allocationMap.set(
-      a.name,
-      a
-    );
-
-  });
-
-  // Reserved allocations
-
-  this.applyReserved(
-    allocationMap,
-    workbook.reserved,
-    workbook.settings.resources
-  );
-
-  // Process every resource
-
-  workbook.settings.resources.forEach(resource => {
-
-    this.processResource(
-
-      result,
-
-      allocationMap,
-
-      resource
-
-    );
-
-  });
-
-  return result;
-
-},
-
-  /**
-   * Eligible players only.
-   */
-  getEligiblePlayers(players) {
-
-    return players.filter(player =>
-
-      player.active &&
-      player.eligible
-
-    );
-
-  },
-
-  /**
-   * Create one allocation object.
-   */
-  createAllocation(player, resources) {
-
-    const allocation = {
-
-      id: player.id,
-
-      name: player.name,
-
-      priority: player.priority,
-
-      remarks: player.remarks,
-
-      resources: {}
+      rotationIndex:
+        workbook.settings.rotationIndex
 
     };
 
-    resources.forEach(resource => {
+    this.applyReserved(
+      result,
+      workbook
+    );
 
-      allocation.resources[
-        resource.name
-      ] = {
+    workbook.settings.resources.forEach(resource => {
 
-        assigned: 0,
-
-        reserved: 0,
-
-        base: 0,
-
-        rotation: 0,
-
-        limit: resource.limit,
-
-        type: resource.type
-
-      };
+      this.processResource(
+        result,
+        workbook,
+        resource
+      );
 
     });
 
-    return allocation;
+    return result;
 
   },
 
   /**
-   * Apply reserved allocations.
+   * Create allocation objects for every
+   * active & eligible player.
    */
-  applyReserved(
-  allocationMap,
-  reserved,
-  resources
-) {
+  buildAllocations(players, resources) {
 
-  reserved.forEach(entry => {
+    return players
 
-    const allocation =
-      allocationMap.get(
-        entry.player
+      .filter(player =>
+        player.active &&
+        player.eligible
+      )
+
+      .map(player => {
+
+        const allocation = {
+
+          id: player.id,
+
+          name: player.name,
+
+          priority: player.priority,
+
+          remarks: player.remarks,
+
+          resources: {}
+
+        };
+
+        resources.forEach(resource => {
+
+          allocation.resources[
+            resource.name
+          ] = {
+
+            assigned: 0,
+
+            reserved: 0,
+
+            limit: resource.limit,
+
+            type: resource.type
+
+          };
+
+        });
+
+        return allocation;
+
+      });
+
+  },
+
+  /**
+   * Reserved allocation.
+   */
+  applyReserved(result, workbook) {
+
+    // Commit 2
+
+  },
+
+  /**
+   * Process one resource.
+   */
+  processResource(
+    result,
+    workbook,
+    resource
+  ) {
+
+    const context =
+      this.buildContext(
+        result,
+        resource
       );
 
-    if (!allocation)
-      return;
-
-    const resource =
-      allocation.resources[
-        entry.resource
-      ];
-
-    if (!resource)
-      return;
-
-    resource.reserved =
-      entry.quantity;
-
-    resource.assigned =
-      entry.quantity;
-
-  });
-
-},
-
-processResource(
-  result,
-  allocationMap,
-  resource
-) {
-
-  const context =
-    this.buildResourceContext(
-      result,
-      resource
+    this.applyBaseAllocation(
+      context
     );
 
-  this.applyBaseAllocation(
+    result.rotationIndex =
+      this.applyRotation(
+        context,
+        result.rotationIndex
+      );
+
+    this.applyReserveAllocation(
+      context,
+      workbook
+    );
+
+    this.calculateOverflow(
+      result,
+      context
+    );
+
+  },
+
+  /**
+   * Build context.
+   */
+  buildContext(
+    result,
+    resource
+  ) {
+
+    return {
+
+      resource,
+
+      eligible: [],
+
+      reservedTotal: 0,
+
+      remaining: 0
+
+    };
+
+  },
+
+  /**
+   * Base allocation.
+   */
+  applyBaseAllocation(
     context
-  );
+  ) {
 
-  result.overflow[
-    resource.name
-  ] = context.overflow;
+    // Commit 3
 
-},
+  },
 
-/**
- * Build allocation context for one resource.
- */
-buildResourceContext(
-  result,
-  resource
-) {
+  /**
+   * Rotation.
+   */
+  applyRotation(
+    context,
+    rotationIndex
+  ) {
 
-  let reservedTotal = 0;
+    return rotationIndex;
 
-  const eligible = [];
+  },
 
-  result.allocations.forEach(player => {
+  /**
+   * Reserve allocation.
+   */
+  applyReserveAllocation(
+    context,
+    workbook
+  ) {
 
-    const slot =
-      player.resources[
-        resource.name
-      ];
+    // Commit 5
 
-    reservedTotal +=
-      slot.reserved;
+  },
 
-    slot.remainingCapacity =
-      Math.max(
-        0,
-        slot.limit -
-        slot.reserved
-      );
+  /**
+   * Overflow.
+   */
+  calculateOverflow(
+    result,
+    context
+  ) {
 
-    if (
-      slot.remainingCapacity > 0
-    ) {
+    result.overflow[
+      context.resource.name
+    ] = context.remaining;
 
-      eligible.push(player);
-
-    }
-
-  });
-
-  return {
-
-  // Resource definition
-  resource,
-
-  // Totals
-  reservedTotal,
-
-  remaining:
-    Math.max(
-      0,
-      resource.total -
-      reservedTotal
-    ),
-
-  allocated: 0,
-
-  overflow: 0,
-
-  // Players
-  eligible,
-
-  remainingPlayers:
-    eligible.slice(),
-
-  // Allocation metadata
-  base: 0,
-
-  rotationUsed: 0
-
-  };
-
-},
-
-/**
- * Apply fair base allocation (Option A).
- *
- * Everyone receives the same base amount.
- * Leftover resources are handled later by Rotation.
- */
-applyBaseAllocation(context) {
-
-  if (context.remaining <= 0)
-    return;
-
-  if (context.eligible.length === 0)
-    return;
-
-  const base = Math.floor(
-    context.remaining /
-    context.eligible.length
-  );
-
-  context.base = base;
-
-  if (base <= 0)
-    return;
-
-  let allocated = 0;
-
-  context.eligible.forEach(player => {
-
-    const slot =
-      player.resources[
-        context.resource.name
-      ];
-
-    const grant =
-      Math.min(
-        base,
-        slot.remainingCapacity
-      );
-
-    slot.assigned += grant;
-    slot.base += grant;
-
-    slot.assigned += grant;
-    slot.remainingCapacity -= grant;
-
-    allocated += grant;
-
-  });
-
-  context.remaining -= allocated;
-  context.allocated += allocated;
-
-  context.overflow = context.remaining;
-  context.remainingPlayers =
-  context.eligible.filter(player => {
-
-    const slot =
-      player.resources[
-        context.resource.name
-      ];
-
-    return slot.remainingCapacity > 0;
-
-  });
-},
+  }
 
 });
