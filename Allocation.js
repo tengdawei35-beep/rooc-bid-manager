@@ -183,23 +183,65 @@ applyReserved(result, workbook) {
    * Build context.
    */
   buildContext(
-    result,
-    resource
-  ) {
+  result,
+  resource
+) {
 
-    return {
+  const context = {
 
-      resource,
+    resource,
 
-      eligible: [],
+    eligible: [],
 
-      reservedTotal: 0,
+    reservedTotal: 0,
 
-      remaining: 0
+    remaining: 0
 
-    };
+  };
 
-  },
+  result.allocations.forEach(player => {
+
+    const slot =
+      player.resources[
+        resource.name
+      ];
+
+    context.reservedTotal +=
+      slot.reserved;
+
+    const remainingCapacity =
+      Math.max(
+        0,
+        slot.limit -
+        slot.assigned
+      );
+
+    if (remainingCapacity > 0) {
+
+      context.eligible.push({
+
+        player,
+
+        slot,
+
+        remainingCapacity
+
+      });
+
+    }
+
+  });
+
+  context.remaining =
+    Math.max(
+      0,
+      resource.total -
+      context.reservedTotal
+    );
+
+  return context;
+
+},
 
   /**
    * Base allocation.
