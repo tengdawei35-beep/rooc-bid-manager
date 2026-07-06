@@ -16,8 +16,13 @@ const Output = Object.freeze({
   render(workbook, result) {
 
     const sheet =
-      this.createAllocationSheet();
+      this.prepareSheet();
 
+    this.writeSummary(
+      sheet,
+      workbook,
+      result
+    );
     this.writeHeader(
       sheet,
       workbook.settings.resources
@@ -37,31 +42,108 @@ const Output = Object.freeze({
   },
 
   /**
-   * Create Allocation sheet.
+   * Prepare Allocation sheet.
    */
-  createAllocationSheet() {
+  prepareSheet() {
 
     const ss =
       SpreadsheetApp.getActive();
 
-    const existing =
+    let sheet =
       ss.getSheetByName(
         "Allocation"
       );
 
-    if (existing) {
+    if (!sheet) {
 
-      ss.deleteSheet(
-        existing
+      sheet =
+        ss.insertSheet(
+          "Allocation"
+        );
+
+    } else {
+
+      sheet.clear();
+      sheet.clearFormats();
+      sheet.clearNotes();
+      sheet.clearDataValidations();
+
+      if (sheet.getFilter()) {
+        sheet.getFilter().remove();
+      }
+
+      const merges =
+        sheet.getMergedRanges();
+
+      merges.forEach(range =>
+        range.breakApart()
       );
 
     }
 
-    return ss.insertSheet(
-      "Allocation"
-    );
+    return sheet;
 
   },
+
+/**
+ * Resource summary.
+ */
+writeSummary(
+  sheet,
+  workbook,
+  result
+) {
+
+  const rows = [
+
+    [
+      "Resource",
+      "Total",
+      "Allocated",
+      "Overflow"
+    ]
+
+  ];
+
+  workbook.settings.resources.forEach(resource => {
+
+    let allocated = 0;
+
+    result.allocations.forEach(player => {
+
+      allocated +=
+        player.resources[
+          resource.name
+        ].assigned;
+
+    });
+
+    rows.push([
+
+      resource.name,
+
+      resource.total,
+
+      allocated,
+
+      result.overflow[
+        resource.name
+      ] || 0
+
+    ]);
+
+  });
+
+  sheet
+    .getRange(
+      1,
+      1,
+      rows.length,
+      rows[0].length
+    )
+    .setValues(rows);
+
+},
 
   /**
    * Header row.
@@ -87,7 +169,7 @@ const Output = Object.freeze({
 
     sheet
       .getRange(
-        1,
+        6,
         1,
         1,
         header.length
@@ -140,7 +222,7 @@ const Output = Object.freeze({
 
     sheet
       .getRange(
-        2,
+        7,
         1,
         values.length,
         values[0].length
