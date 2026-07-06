@@ -25,3 +25,24 @@ function testAllocation() {
   );
 
 }
+
+function testOutput() {
+
+  const workbook =
+    Workbook.read();
+
+  Validator.run(
+    workbook
+  );
+
+  const result =
+    Allocator.allocate(
+      workbook
+    );
+
+  Output.render(
+    workbook,
+    result
+  );
+
+}
