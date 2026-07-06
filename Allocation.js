@@ -130,6 +130,10 @@ allocate(workbook) {
 
         reserved: 0,
 
+        base: 0,
+
+        rotation: 0,
+
         limit: resource.limit,
 
         type: resource.type
@@ -197,7 +201,7 @@ processResource(
 
   result.overflow[
     resource.name
-  ] = context.remaining;
+  ] = context.overflow;
 
 },
 
@@ -242,18 +246,33 @@ buildResourceContext(
 
   return {
 
-    resource,
+  // Resource definition
+  resource,
 
-    reservedTotal,
+  // Totals
+  reservedTotal,
 
-    remaining:
-      Math.max(
-        0,
-        resource.total -
-        reservedTotal
-      ),
+  remaining:
+    Math.max(
+      0,
+      resource.total -
+      reservedTotal
+    ),
 
-    eligible
+  allocated: 0,
+
+  overflow: 0,
+
+  // Players
+  eligible,
+
+  remainingPlayers:
+    eligible.slice(),
+
+  // Allocation metadata
+  base: 0,
+
+  rotationUsed: 0
 
   };
 
@@ -278,6 +297,8 @@ applyBaseAllocation(context) {
     context.eligible.length
   );
 
+  context.base = base;
+
   if (base <= 0)
     return;
 
@@ -297,7 +318,9 @@ applyBaseAllocation(context) {
       );
 
     slot.assigned += grant;
+    slot.base += grant;
 
+    slot.assigned += grant;
     slot.remainingCapacity -= grant;
 
     allocated += grant;
@@ -305,7 +328,20 @@ applyBaseAllocation(context) {
   });
 
   context.remaining -= allocated;
+  context.allocated += allocated;
 
+  context.overflow = context.remaining;
+  context.remainingPlayers =
+  context.eligible.filter(player => {
+
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
+
+    return slot.remainingCapacity > 0;
+
+  });
 },
 
 });
