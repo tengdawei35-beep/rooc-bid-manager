@@ -185,9 +185,29 @@ processResource(
   resource
 ) {
 
+  const context =
+    this.buildResourceContext(
+      result,
+      resource
+    );
+
+  result.overflow[
+    resource.name
+  ] = context.remaining;
+
+},
+
+/**
+ * Build allocation context for one resource.
+ */
+buildResourceContext(
+  result,
+  resource
+) {
+
   let reservedTotal = 0;
 
-  let eligible = [];
+  const eligible = [];
 
   result.allocations.forEach(player => {
 
@@ -199,21 +219,15 @@ processResource(
     reservedTotal +=
       slot.reserved;
 
-    const remainingCapacity =
+    slot.remainingCapacity =
       Math.max(
-
         0,
-
         slot.limit -
         slot.reserved
-
       );
 
-    slot.remainingCapacity =
-      remainingCapacity;
-
     if (
-      remainingCapacity > 0
+      slot.remainingCapacity > 0
     ) {
 
       eligible.push(player);
@@ -222,20 +236,23 @@ processResource(
 
   });
 
-  const remaining =
-    Math.max(
+  return {
 
-      0,
+    resource,
 
-      resource.total -
-      reservedTotal
+    reservedTotal,
 
-    );
+    remaining:
+      Math.max(
+        0,
+        resource.total -
+        reservedTotal
+      ),
 
-  result.overflow[
-    resource.name
-  ] = remaining;
+    eligible
 
-}
+  };
+
+},
 
 });
