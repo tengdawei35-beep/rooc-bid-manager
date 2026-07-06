@@ -10,80 +10,93 @@
 
 const Output = Object.freeze({
 
-  /**
-   * Entry point.
-   */
-  render(workbook, result) {
+ /**
+ * Entry point.
+ */
+render(workbook, result) {
 
-    const sheet =
-      this.prepareSheet();
+  //
+  // Allocation Report
+  //
 
-    this.writeSummary(
-      sheet,
+  const sheet =
+    this.prepareSheet();
+
+  this.writeSummary(
+    sheet,
+    workbook,
+    result
+  );
+
+  this.writeHeader(
+    sheet,
+    workbook.settings.resources
+  );
+
+  this.writeRows(
+    sheet,
+    workbook.settings.resources,
+    result.allocations
+  );
+
+  this.formatSheet(
+    sheet,
+    workbook.settings.resources
+  );
+
+  //
+  // Bid Sheet
+  //
+
+  const auctionPlan =
+    AuctionPlanner.buildPlan(
       workbook,
       result
     );
-    this.writeHeader(
-      sheet,
-      workbook.settings.resources
-    );
 
-    this.writeRows(
-      sheet,
-      workbook.settings.resources,
-      result.allocations
-    );
+  BidRenderer.render(
+    workbook,
+    auctionPlan
+  );
 
-    sheet.autoResizeColumns(
-      1,
-      workbook.settings.resources.length + 1
-    );
-
-  },
+},
 
   /**
    * Prepare Allocation sheet.
    */
-  prepareSheet() {
+    prepareSheet() {
 
-    const ss =
-      SpreadsheetApp.getActive();
+      const ss =
+        SpreadsheetApp.getActive();
 
-    let sheet =
-      ss.getSheetByName(
-        "Allocation"
-      );
-
-    if (!sheet) {
-
-      sheet =
-        ss.insertSheet(
+      let sheet =
+        ss.getSheetByName(
           "Allocation"
         );
 
-    } else {
+      if (!sheet) {
 
-      sheet.clear();
-      sheet.clearFormats();
-      sheet.clearNotes();
-      sheet.clearDataValidations();
+        sheet =
+          ss.insertSheet(
+            "Allocation"
+          );
 
-      if (sheet.getFilter()) {
-        sheet.getFilter().remove();
+      } else {
+
+        sheet.clear();
+
+        const filter =
+          sheet.getFilter();
+
+        if (filter) {
+          filter.remove();
+        }
+
       }
 
-      const merges =
-        sheet.getMergedRanges();
+      return sheet;
 
-      merges.forEach(range =>
-        range.breakApart()
-      );
-
-    }
-
-    return sheet;
-
-  },
+    },
 
 /**
  * Resource summary.
@@ -231,6 +244,52 @@ writeSummary(
         values
       );
 
+  },
+
+  /**
+   * Apply basic formatting.
+   */
+  formatSheet(
+    sheet,
+    resources
+  ) {
+
+    const summaryRows = 1 + resources.length;
+
+    // Summary header
+    sheet
+      .getRange(1, 1, 1, 4)
+      .setFontWeight("bold");
+
+    // Allocation header
+    sheet
+      .getRange(6, 1, 1, resources.length + 1)
+      .setFontWeight("bold");
+
+    // Freeze summary + header
+    sheet.setFrozenRows(6);
+
+    // Filter allocation table
+    const lastRow =
+      sheet.getLastRow();
+
+    const lastCol =
+      resources.length + 1;
+
+    if (lastRow >= 6) {
+
+      sheet
+        .getRange(
+          6,
+          1,
+          lastRow - 5,
+          lastCol
+        )
+        .createFilter();
+
+    }
+
   }
+
 
 });
