@@ -222,9 +222,7 @@ applyReserved(result, workbook) {
 
         player,
 
-        slot,
-
-        remainingCapacity
+        slot
 
       });
 
@@ -246,25 +244,116 @@ applyReserved(result, workbook) {
   /**
    * Base allocation.
    */
-  applyBaseAllocation(
-    context
-  ) {
+applyBaseAllocation(
+  context
+) {
 
-    // Commit 3
+  if (context.remaining <= 0)
+    return;
 
-  },
+  if (context.eligible.length === 0)
+    return;
+
+  const base = Math.floor(
+    context.remaining /
+    context.eligible.length
+  );
+
+  if (base <= 0)
+    return;
+
+  let allocated = 0;
+
+  context.eligible.forEach(entry => {
+
+    const remainingCapacity =
+      entry.slot.limit -
+      entry.slot.assigned;
+
+    const grant = Math.min(
+      base,
+      remainingCapacity
+    );
+
+    entry.slot.assigned += grant;
+
+    allocated += grant;
+
+  });
+
+  context.remaining -= allocated;
+
+},
 
   /**
    * Rotation.
    */
-  applyRotation(
-    context,
-    rotationIndex
-  ) {
+applyRotation(
+  context,
+  rotationIndex
+) {
 
+  if (context.remaining <= 0)
     return rotationIndex;
 
-  },
+  if (context.eligible.length === 0)
+    return rotationIndex;
+
+  let index =
+    rotationIndex %
+    context.eligible.length;
+
+  let exhausted = false;
+
+  while (
+    context.remaining > 0 &&
+    !exhausted
+  ) {
+
+    exhausted = true;
+
+    for (
+      let i = 0;
+      i < context.eligible.length;
+      i++
+    ) {
+
+      const current =
+        (index + i) %
+        context.eligible.length;
+
+      const entry =
+        context.eligible[current];
+
+      const slot =
+        entry.slot;
+
+      if (
+        slot.assigned >= slot.limit
+      ) {
+        continue;
+      }
+
+      slot.assigned++;
+
+      context.remaining--;
+
+      index =
+        (current + 1) %
+        context.eligible.length;
+
+      exhausted = false;
+
+      if (context.remaining <= 0)
+        break;
+
+    }
+
+  }
+
+  return index;
+
+},
 
   /**
    * Reserve allocation.
