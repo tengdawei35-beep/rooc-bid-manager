@@ -19,49 +19,73 @@ const Allocator = Object.freeze({
    * @param {Object} workbook
    * @returns {Object}
    */
-  allocate(workbook) {
+allocate(workbook) {
 
-    const result = {
+  const result = {
 
-      allocations: [],
+    allocations: [],
 
-      overflow: {},
+    overflow: {},
 
-      rotationIndex:
-        workbook.settings.rotationIndex
+    rotationIndex:
+      workbook.settings.rotationIndex
 
-    };
+  };
 
-    const players =
-      this.getEligiblePlayers(
-        workbook.players
-      );
+  const players =
+    this.getEligiblePlayers(
+      workbook.players
+    );
 
-    // Build allocation objects
+  result.allocations =
+    players.map(player =>
+      this.createAllocation(
+        player,
+        workbook.settings.resources
+      )
+    );
 
-    result.allocations =
-      players.map(player =>
-        this.createAllocation(
-          player,
-          workbook.settings.resources
-        )
-      );
+  // Build fast lookup table
 
-    // Reserved allocations
+  const allocationMap =
+    new Map();
 
-    workbook.settings.resources.forEach(resource => {
+  result.allocations.forEach(a => {
 
-      this.applyReserved(
-        result.allocations,
-        workbook.reserved,
-        resource
-      );
+    allocationMap.set(
+      a.name,
+      a
+    );
 
-    });
+  });
 
-    return result;
+  // Reserved allocations
 
-  },
+  this.applyReserved(
+    allocationMap,
+    workbook.reserved,
+    workbook.settings.resources
+  );
+
+  // Process every resource
+
+  workbook.settings.resources.forEach(resource => {
+
+    this.processResource(
+
+      result,
+
+      allocationMap,
+
+      resource
+
+    );
+
+  });
+
+  return result;
+
+},
 
   /**
    * Eligible players only.
@@ -122,37 +146,96 @@ const Allocator = Object.freeze({
    * Apply reserved allocations.
    */
   applyReserved(
-    allocations,
-    reserved,
-    resource
-  ) {
+  allocationMap,
+  reserved,
+  resources
+) {
 
-    reserved
-      .filter(r =>
-        r.resource === resource.name
-      )
-      .forEach(entry => {
+  reserved.forEach(entry => {
 
-        const allocation =
-          allocations.find(a =>
-            a.name === entry.player
-          );
+    const allocation =
+      allocationMap.get(
+        entry.player
+      );
 
-        if (!allocation)
-          return;
+    if (!allocation)
+      return;
 
-        allocation.resources[
-          resource.name
-        ].reserved =
-          entry.quantity;
+    const resource =
+      allocation.resources[
+        entry.resource
+      ];
 
-        allocation.resources[
-          resource.name
-        ].assigned =
-          entry.quantity;
+    if (!resource)
+      return;
 
-      });
+    resource.reserved =
+      entry.quantity;
 
-  }
+    resource.assigned =
+      entry.quantity;
+
+  });
+
+},
+
+processResource(
+  result,
+  allocationMap,
+  resource
+) {
+
+  let reservedTotal = 0;
+
+  let eligible = [];
+
+  result.allocations.forEach(player => {
+
+    const slot =
+      player.resources[
+        resource.name
+      ];
+
+    reservedTotal +=
+      slot.reserved;
+
+    const remainingCapacity =
+      Math.max(
+
+        0,
+
+        slot.limit -
+        slot.reserved
+
+      );
+
+    slot.remainingCapacity =
+      remainingCapacity;
+
+    if (
+      remainingCapacity > 0
+    ) {
+
+      eligible.push(player);
+
+    }
+
+  });
+
+  const remaining =
+    Math.max(
+
+      0,
+
+      resource.total -
+      reservedTotal
+
+    );
+
+  result.overflow[
+    resource.name
+  ] = remaining;
+
+}
 
 });
