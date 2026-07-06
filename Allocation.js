@@ -158,16 +158,19 @@ applyReserved(result, workbook) {
       );
 
     this.applyBaseAllocation(
+      result,
       context
     );
 
     result.rotationIndex =
       this.applyRotation(
+        result,
         context,
         result.rotationIndex
       );
 
     this.applyReserveAllocation(
+      result,
       context,
       workbook
     );
@@ -182,81 +185,73 @@ applyReserved(result, workbook) {
   /**
    * Build context.
    */
-  buildContext(
+  /**
+ * Build resource context.
+ */
+buildContext(
   result,
   resource
 ) {
 
-  const context = {
-
-    resource,
-
-    eligible: [],
-
-    reservedTotal: 0,
-
-    remaining: 0
-
-  };
+  let reservedTotal = 0;
 
   result.allocations.forEach(player => {
 
-    const slot =
+    reservedTotal +=
       player.resources[
         resource.name
-      ];
-
-    context.reservedTotal +=
-      slot.reserved;
-
-    const remainingCapacity =
-      Math.max(
-        0,
-        slot.limit -
-        slot.assigned
-      );
-
-    if (remainingCapacity > 0) {
-
-      context.eligible.push({
-
-        player,
-
-        slot
-
-      });
-
-    }
+      ].reserved;
 
   });
 
-  context.remaining =
-    Math.max(
-      0,
-      resource.total -
-      context.reservedTotal
-    );
+  return {
 
-  return context;
+    resource,
+
+    reservedTotal,
+
+    remaining:
+      Math.max(
+        0,
+        resource.total -
+        reservedTotal
+      )
+
+  };
 
 },
 
   /**
    * Base allocation.
    */
+/**
+ * Base allocation.
+ */
 applyBaseAllocation(
+  result,
   context
 ) {
 
   if (context.remaining <= 0)
     return;
 
-  if (context.eligible.length === 0)
+  const eligible = result.allocations.filter(player => {
+
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
+
+    return slot.assigned < slot.limit;
+
+  });
+
+  if (eligible.length === 0)
     return;
 
   const base = Math.floor(
     context.remaining /
-    context.eligible.length
+    eligible.length
   );
 
   if (base <= 0)
@@ -264,18 +259,24 @@ applyBaseAllocation(
 
   let allocated = 0;
 
-  context.eligible.forEach(entry => {
+  eligible.forEach(player => {
 
-    const remainingCapacity =
-      entry.slot.limit -
-      entry.slot.assigned;
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
 
-    const grant = Math.min(
-      base,
-      remainingCapacity
-    );
+    const capacity =
+      slot.limit -
+      slot.assigned;
 
-    entry.slot.assigned += grant;
+    const grant =
+      Math.min(
+        base,
+        capacity
+      );
+
+    slot.assigned += grant;
 
     allocated += grant;
 
@@ -288,7 +289,11 @@ applyBaseAllocation(
   /**
    * Rotation.
    */
+/**
+ * Apply rotation allocation.
+ */
 applyRotation(
+  result,
   context,
   rotationIndex
 ) {
@@ -296,58 +301,64 @@ applyRotation(
   if (context.remaining <= 0)
     return rotationIndex;
 
-  if (context.eligible.length === 0)
+  let eligible = result.allocations.filter(player => {
+
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
+
+    return slot.assigned < slot.limit;
+
+  });
+
+  if (eligible.length === 0)
     return rotationIndex;
 
   let index =
     rotationIndex %
-    context.eligible.length;
-
-  let exhausted = false;
+    eligible.length;
 
   while (
     context.remaining > 0 &&
-    !exhausted
+    eligible.length > 0
   ) {
 
-    exhausted = true;
+    const player =
+      eligible[index];
 
-    for (
-      let i = 0;
-      i < context.eligible.length;
-      i++
-    ) {
+    const slot =
+      player.resources[
+        context.resource.name
+      ];
 
-      const current =
-        (index + i) %
-        context.eligible.length;
-
-      const entry =
-        context.eligible[current];
-
-      const slot =
-        entry.slot;
-
-      if (
-        slot.assigned >= slot.limit
-      ) {
-        continue;
-      }
+    if (slot.assigned < slot.limit) {
 
       slot.assigned++;
 
       context.remaining--;
 
-      index =
-        (current + 1) %
-        context.eligible.length;
-
-      exhausted = false;
-
-      if (context.remaining <= 0)
-        break;
-
     }
+
+    // Recalculate eligible players
+    eligible = result.allocations.filter(player => {
+
+      const slot =
+        player.resources[
+          context.resource.name
+        ];
+
+      return slot.assigned < slot.limit;
+
+    });
+
+    if (eligible.length === 0)
+      break;
+
+    index++;
+
+    if (index >= eligible.length)
+      index = 0;
 
   }
 
@@ -355,17 +366,70 @@ applyRotation(
 
 },
 
-  /**
-   * Reserve allocation.
-   */
-  applyReserveAllocation(
-    context,
-    workbook
-  ) {
+ /**
+ * Apply reserve allocation.
+ *
+ * Remaining resources are distributed fairly
+ * among players listed in the Reserved Allocation
+ * sheet for this resource.
+ *
+ * Limits are ignored during this phase.
+ */
+applyReserveAllocation(
+  result,
+  context,
+  workbook
+) {
 
-    // Commit 5
+  if (context.remaining <= 0)
+    return;
 
-  },
+  // Players participating in reserve pool
+  const participants =
+    workbook.reserved
+
+      .filter(entry =>
+        entry.resource === context.resource.name
+      )
+
+      .map(entry => {
+
+        const allocation =
+          result.allocations.find(player =>
+            player.name === entry.player
+          );
+
+        return allocation;
+
+      })
+
+      .filter(allocation => allocation);
+
+  if (participants.length === 0)
+    return;
+
+  let index = 0;
+
+  while (context.remaining > 0) {
+
+    const player =
+      participants[index];
+
+    player.resources[
+      context.resource.name
+    ].assigned++;
+
+    context.remaining--;
+
+    index++;
+
+    if (index >= participants.length) {
+      index = 0;
+    }
+
+  }
+
+},
 
   /**
    * Overflow.
