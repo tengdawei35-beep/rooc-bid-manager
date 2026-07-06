@@ -112,11 +112,35 @@ const Allocator = Object.freeze({
   /**
    * Reserved allocation.
    */
-  applyReserved(result, workbook) {
+applyReserved(result, workbook) {
 
-    // Commit 2
+  workbook.reserved.forEach(entry => {
 
-  },
+    const allocation =
+      result.allocations.find(player =>
+        player.name === entry.player
+      );
+
+    if (!allocation)
+      return;
+
+    const slot =
+      allocation.resources[
+        entry.resource
+      ];
+
+    if (!slot)
+      return;
+
+    slot.reserved =
+      entry.quantity;
+
+    slot.assigned =
+      entry.quantity;
+
+  });
+
+},
 
   /**
    * Process one resource.
