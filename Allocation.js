@@ -27,7 +27,8 @@ const Allocator = Object.freeze({
 
       allocations: this.buildAllocations(
         workbook.players,
-        workbook.settings.resources
+        workbook.settings.resources,
+        workbook.reserved
       ),
 
       overflow: {},
@@ -60,54 +61,95 @@ const Allocator = Object.freeze({
    * Create allocation objects for every
    * active & eligible player.
    */
-  buildAllocations(players, resources) {
+  /**
+ * Create allocation objects.
+ *
+ * Includes:
+ * - Active & eligible players
+ * - Reserved-only players (even if inactive/ineligible)
+ */
+/**
+ * Create allocation objects.
+ *
+ * Includes:
+ * - Active & eligible players
+ * - Reserved-only players (inactive/ineligible)
+ */
+buildAllocations(
+  players,
+  resources,
+  reserved
+) {
 
-    return players
+  return players
 
-      .filter(player =>
-        player.active &&
-        player.eligible
-      )
+    .filter(player => {
 
-      .map(player => {
+      return (
 
-        const allocation = {
+        (player.active && player.eligible)
 
-          id: player.id,
+        ||
 
-          name: player.name,
+        reserved.some(entry =>
+          entry.player === player.name
+        )
 
-          priority: player.priority,
+      );
 
-          remarks: player.remarks,
+    })
 
-          resources: {}
+    .map(player => {
+
+      const isReservedOnly =
+
+        reserved.some(entry =>
+          entry.player === player.name
+        )
+
+        &&
+
+        !(player.active && player.eligible);
+
+      const allocation = {
+
+        id: player.id,
+
+        name: player.name,
+
+        priority: player.priority,
+
+        remarks: player.remarks,
+
+        reservedOnly: isReservedOnly,
+
+        resources: {}
+
+      };
+
+      resources.forEach(resource => {
+
+        allocation.resources[
+          resource.name
+        ] = {
+
+          assigned: 0,
+
+          reserved: 0,
+
+          limit: resource.limit,
+
+          type: resource.type
 
         };
 
-        resources.forEach(resource => {
-
-          allocation.resources[
-            resource.name
-          ] = {
-
-            assigned: 0,
-
-            reserved: 0,
-
-            limit: resource.limit,
-
-            type: resource.type
-
-          };
-
-        });
-
-        return allocation;
-
       });
 
-  },
+      return allocation;
+
+    });
+
+},
 
   /**
    * Reserved allocation.
@@ -221,9 +263,6 @@ buildContext(
 
 },
 
-  /**
-   * Base allocation.
-   */
 /**
  * Base allocation.
  */
@@ -236,6 +275,11 @@ applyBaseAllocation(
     return;
 
   const eligible = result.allocations.filter(player => {
+
+    // Reserved-only players do not
+    // participate in normal allocation.
+    if (player.reservedOnly)
+      return false;
 
     const slot =
       player.resources[
@@ -286,9 +330,6 @@ applyBaseAllocation(
 
 },
 
-  /**
-   * Rotation.
-   */
 /**
  * Apply rotation allocation.
  */
@@ -302,6 +343,11 @@ applyRotation(
     return rotationIndex;
 
   let eligible = result.allocations.filter(player => {
+
+    // Reserved-only players do not
+    // participate in normal allocation.
+    if (player.reservedOnly)
+      return false;
 
     const slot =
       player.resources[
@@ -335,13 +381,18 @@ applyRotation(
     if (slot.assigned < slot.limit) {
 
       slot.assigned++;
-
       context.remaining--;
 
     }
 
+    //
     // Recalculate eligible players
+    //
+
     eligible = result.allocations.filter(player => {
+
+      if (player.reservedOnly)
+        return false;
 
       const slot =
         player.resources[

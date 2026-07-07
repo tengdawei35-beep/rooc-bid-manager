@@ -141,76 +141,61 @@ const Validator = Object.freeze({
 
   },
 
-  /**
-   * Reserved allocations
-   */
-  validateReserved(players, resources, reserved) {
+ /**
+ * Reserved allocations.
+ *
+ * Reserved players only need to exist.
+ * They do NOT need to be active or eligible.
+ */
+validateReserved(players, resources, reserved) {
 
-    const playerMap = Utils.createMap(
-      players,
-      "name"
-    );
+  const playerMap = Utils.createMap(
+    players,
+    "name"
+  );
 
-    const resourceMap = Utils.createMap(
-      resources,
-      "name"
-    );
+  const resourceMap = Utils.createMap(
+    resources,
+    "name"
+  );
 
-    const seen = new Set();
+  const seen = new Set();
 
-    reserved.forEach(entry => {
+  reserved.forEach(entry => {
 
-      const key =
-        entry.player +
-        "|" +
-        entry.resource;
+    const key =
+      entry.player +
+      "|" +
+      entry.resource;
 
-      if (seen.has(key))
-        throw new Error(
-          "Duplicate reserved allocation: " +
-          key
-        );
+    if (seen.has(key))
+      throw new Error(
+        "Duplicate reserved allocation: " +
+        key
+      );
 
-      seen.add(key);
+    seen.add(key);
 
-      if (!playerMap.has(entry.player))
-        throw new Error(
-          "Unknown player: " +
-          entry.player
-        );
+    if (!playerMap.has(entry.player))
+      throw new Error(
+        "Unknown player: " +
+        entry.player
+      );
 
-      if (!resourceMap.has(entry.resource))
-        throw new Error(
-          "Unknown resource: " +
-          entry.resource
-        );
+    if (!resourceMap.has(entry.resource))
+      throw new Error(
+        "Unknown resource: " +
+        entry.resource
+      );
 
-      const player =
-        playerMap.get(entry.player);
+    if (entry.quantity < 0)
+      throw new Error(
+        "Negative quantity for " +
+        entry.player
+      );
 
-      if (!player.active)
-        throw new Error(
-          entry.player +
-          " is inactive."
-        );
+  });
 
-      if (!player.eligible)
-        throw new Error(
-          entry.player +
-          " is not eligible."
-        );
-
-      const resource =
-        resourceMap.get(entry.resource);
-
-      if (entry.quantity < 0)
-        throw new Error(
-          "Negative quantity for " +
-          entry.player
-        );
-
-    });
-
-  }
+}
 
 });

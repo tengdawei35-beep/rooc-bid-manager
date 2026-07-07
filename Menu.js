@@ -71,7 +71,7 @@ function generateBids() {
     }
 
     const result =
-      Allocation.allocate(
+      Allocator.allocate(
         workbook
       );
 
@@ -122,7 +122,7 @@ function quickRegenerate() {
       Workbook.read();
 
     const result =
-      Allocation.allocate(
+      Allocator.allocate(
         workbook
       );
 
